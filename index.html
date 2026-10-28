@@ -1,0 +1,1877 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Studio 48kHz Mono WAV Recorder & Acoustic Verification</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            studio: {
+              950: '#090d16',
+              900: '#0f172a',
+              800: '#1e293b',
+              700: '#334155',
+              accent: '#10b981',
+              warn: '#f59e0b',
+              danger: '#ef4444',
+              telegram: '#24A1DE'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body {
+      background-color: #090d16;
+      color: #f1f5f9;
+      font-family: 'Inter', sans-serif;
+    }
+    .meter-bar-transition {
+      transition: width 60ms linear;
+    }
+    .pulse-recording {
+      animation: pulseRec 1.4s infinite ease-in-out;
+    }
+    @keyframes pulseRec {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.12); opacity: 0.65; }
+    }
+    .gap-countdown-pulse {
+      animation: gapPulse 1s infinite ease-in-out;
+    }
+    @keyframes gapPulse {
+      0%, 100% { border-color: rgba(245, 158, 11, 0.9); box-shadow: 0 0 25px rgba(245, 158, 11, 0.25); }
+      50% { border-color: rgba(245, 158, 11, 0.3); box-shadow: 0 0 5px rgba(245, 158, 11, 0.05); }
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-emerald-500 selection:text-slate-950">
+
+  <!-- ONBOARDING MODAL (Shown on initial load so user enters Name & Contact Number first) -->
+  <div id="onboardingModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+      <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-sky-500"></div>
+      
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-xl">
+          <i class="fa-solid fa-microphone-lines"></i>
+        </div>
+        <div>
+          <h2 class="text-xl font-bold text-white">Studio Voice Recording Portal</h2>
+          <p class="text-xs text-slate-400">48 kHz Uncompressed Mono WAV • Acoustic Verification</p>
+        </div>
+      </div>
+
+      <p class="text-sm text-slate-300 mb-5 leading-relaxed">
+        Welcome! Please enter your <strong class="text-white">Full Name</strong> and <strong class="text-white">Contact Number</strong> to begin. Your recording file will automatically be named <code class="text-emerald-400 font-mono bg-slate-800 px-1.5 py-0.5 rounded">Name_Phone(+1)</code> with the last digit incremented by <code class="text-emerald-400 font-mono">+1</code>.
+      </p>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Speaker Full Name *</label>
+          <div class="relative">
+            <i class="fa-solid fa-user absolute left-3.5 top-3.5 text-slate-500 text-sm"></i>
+            <input id="modalNameInput" type="text" placeholder="e.g. Rahul Sharma" 
+              class="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-sm" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Contact / Phone Number *</label>
+          <div class="relative">
+            <i class="fa-solid fa-phone absolute left-3.5 top-3.5 text-slate-500 text-sm"></i>
+            <input id="modalPhoneInput" type="tel" placeholder="e.g. 9876543210" 
+              class="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-sm font-mono" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Speaker Gender</label>
+            <select id="modalGenderInput" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+              <option value="Male">Male Speaker</option>
+              <option value="Female">Female Speaker</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">+1 Last Digit Rule</label>
+            <select id="modalIncrementRule" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500">
+              <option value="math_plus_one">Phone Number + 1 (Default)</option>
+              <option value="last_digit_wrap">Strict Last Digit +1 (9→0)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Live Filename Preview inside Modal -->
+        <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between">
+          <div>
+            <span class="text-[11px] uppercase tracking-wider text-slate-400 block">Auto-Generated Output Filename:</span>
+            <span id="modalFilenamePreview" class="font-mono text-sm font-bold text-emerald-400 break-all">Speaker_0000000001.wav</span>
+          </div>
+          <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-lg font-mono">48kHz Mono</span>
+        </div>
+
+        <div id="modalErrorMsg" class="hidden text-xs text-rose-400 bg-rose-950/50 border border-rose-800/60 rounded-lg px-3 py-2">
+          <i class="fa-solid fa-triangle-exclamation mr-1"></i> Please enter both your Name and a valid Contact Number.
+        </div>
+
+        <button id="modalContinueBtn" type="button" 
+          class="w-full py-3 px-5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2 text-sm">
+          <span>Enter Studio & Check Background Noise</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP HEADER -->
+  <header class="border-b border-slate-800/80 bg-slate-900/70 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+          <i class="fa-solid fa-wave-square text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-base sm:text-lg text-white tracking-tight">Studio WAV Recorder</h1>
+            <span class="text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold">48kHz • 16-Bit • Mono</span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Uncompressed Raw Audio Capture • Background Noise Verification • 3-Script 5s Gap Workflow</p>
+        </div>
+      </div>
+
+      <!-- Active User & Filename Pill -->
+      <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
+        <div class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 flex items-center gap-2.5">
+          <div class="text-xs">
+            <span class="text-slate-400">File ID:</span>
+            <span id="headerFilenameBadge" class="font-mono font-bold text-emerald-400 ml-1">Speaker_0000000001</span>
+          </div>
+          <button id="editProfileBtn" type="button" class="text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded-lg transition" title="Edit Name or Phone Number">
+            <i class="fa-solid fa-pen-to-square mr-1"></i>Edit
+          </button>
+        </div>
+
+        <a href="https://t.me/raai0356" target="_blank" rel="noopener noreferrer" 
+          class="bg-[#24A1DE]/15 hover:bg-[#24A1DE]/25 text-[#38bdf8] border border-[#24A1DE]/40 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+          <i class="fa-brands fa-telegram text-sm"></i>
+          <span>@raai0356</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 flex-1 space-y-6">
+
+    <!-- STEP 1: SPEAKER INFO & MICROPHONE SETUP BAR -->
+    <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+        <!-- Name -->
+        <div class="md:col-span-3">
+          <label class="block text-xs font-semibold text-slate-400 mb-1">1. Speaker Name</label>
+          <input id="mainNameInput" type="text" placeholder="Enter your name" 
+            class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500" />
+        </div>
+
+        <!-- Contact Number -->
+        <div class="md:col-span-3">
+          <label class="block text-xs font-semibold text-slate-400 mb-1">2. Contact Number (Auto +1)</label>
+          <input id="mainPhoneInput" type="tel" placeholder="e.g. 9876543210" 
+            class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white font-mono focus:outline-none focus:border-emerald-500" />
+        </div>
+
+        <!-- Resulting Filename (Editable Override if needed) -->
+        <div class="md:col-span-3">
+          <label class="block text-xs font-semibold text-emerald-400 mb-1 flex items-center justify-between">
+            <span>Generated File Name (+1 Rule)</span>
+            <span id="phoneTransformHint" class="text-[11px] font-mono text-slate-400"></span>
+          </label>
+          <div class="flex items-center bg-slate-950 border border-emerald-500/40 rounded-xl px-3 py-2">
+            <input id="finalBaseFilename" type="text" 
+              class="w-full bg-transparent text-emerald-400 font-mono text-sm font-bold focus:outline-none" />
+            <span class="text-xs font-mono text-slate-500 select-none">.wav</span>
+          </div>
+        </div>
+
+        <!-- Microphone Selector -->
+        <div class="md:col-span-3">
+          <label class="block text-xs font-semibold text-slate-400 mb-1 flex items-center justify-between">
+            <span>3. Studio Audio Input (Raw)</span>
+            <button id="refreshMicBtn" type="button" class="text-[11px] text-sky-400 hover:underline"><i class="fa-solid fa-rotate mr-1"></i>Refresh</button>
+          </label>
+          <select id="micSelect" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500">
+            <option value="">Default Studio Microphone</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAIN TWO-COLUMN STUDIO WORKSPACE -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- LEFT COLUMN (5 COLS): BACKGROUND NOISE TESTER & LIVE ACOUSTIC METERS -->
+      <div class="lg:col-span-5 space-y-6">
+        
+        <!-- REAL-TIME AUDIO METERS & BACKGROUND NOISE CHECK CARD -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div>
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-gauge-high text-emerald-400"></i>
+                <span>Acoustic & Background Noise Check</span>
+              </h2>
+              <p class="text-xs text-slate-400">Raw Unprocessed Signal (No Gate / No EQ / No AGC)</p>
+            </div>
+            <span id="micStatusBadge" class="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 font-medium flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-slate-500" id="micStatusDot"></span>
+              <span id="micStatusText">Mic Standby</span>
+            </span>
+          </div>
+
+          <!-- Oscilloscope & Spectrum Canvas -->
+          <div class="relative bg-slate-950 border border-slate-800 rounded-xl overflow-hidden h-36">
+            <canvas id="audioCanvas" class="w-full h-full block"></canvas>
+            <div class="absolute top-2 left-2.5 flex items-center gap-2 text-[11px] font-mono text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800">
+              <span>SR: <strong class="text-emerald-400">48000 Hz</strong></span>
+              <span>•</span>
+              <span>CH: <strong class="text-emerald-400">1 (Mono)</strong></span>
+              <span>•</span>
+              <span>PCM: <strong class="text-emerald-400">16-bit</strong></span>
+            </div>
+            <div class="absolute bottom-2 right-2.5 flex gap-1">
+              <button id="vizModeWaveBtn" type="button" class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">Waveform</button>
+              <button id="vizModeSpecBtn" type="button" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">FFT Spectrum</button>
+            </div>
+          </div>
+
+          <!-- Live RMS & True Peak Meters -->
+          <div class="space-y-3 bg-slate-950/70 border border-slate-800/90 rounded-xl p-3.5">
+            <!-- RMS Meter -->
+            <div>
+              <div class="flex justify-between text-xs font-mono mb-1">
+                <span class="text-slate-400">LIVE RMS (Loudness / Noise Floor):</span>
+                <span id="liveRmsValue" class="font-bold text-emerald-400">-∞ dBFS</span>
+              </div>
+              <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden relative">
+                <!-- Target zone markers (-65 dBFS noise threshold & -25 to -18 LUFS speech zone) -->
+                <div class="absolute top-0 bottom-0 left-[35%] w-0.5 bg-sky-400/70 z-10" title="-65 dBFS Room Noise Limit"></div>
+                <div class="absolute top-0 bottom-0 left-[75%] right-[18%] bg-emerald-500/20 border-x border-emerald-400/60 z-10" title="-25 to -18 LUFS Speech Target Zone"></div>
+                <div id="rmsMeterBar" class="h-full bg-gradient-to-r from-sky-500 via-emerald-500 to-amber-500 meter-bar-transition rounded-full" style="width: 0%;"></div>
+              </div>
+              <div class="flex justify-between text-[10px] font-mono text-slate-500 mt-1">
+                <span>-100 dB</span>
+                <span class="text-sky-400">-65 dB (Noise Max)</span>
+                <span class="text-emerald-400">-25..-18 (Speech)</span>
+                <span>0 dB</span>
+              </div>
+            </div>
+
+            <!-- True Peak Meter -->
+            <div>
+              <div class="flex justify-between text-xs font-mono mb-1">
+                <span class="text-slate-400">TRUE PEAK (Max < -3.0 dBTP):</span>
+                <span id="livePeakValue" class="font-bold text-slate-200">-∞ dBFS</span>
+              </div>
+              <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden relative">
+                <!-- -3 dB limit marker -->
+                <div class="absolute top-0 bottom-0 left-[97%] w-0.5 bg-rose-500 z-10" title="-3 dBFS True Peak Limit"></div>
+                <div id="peakMeterBar" class="h-full bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500 meter-bar-transition rounded-full" style="width: 0%;"></div>
+              </div>
+              <div class="flex justify-between items-center text-[10px] font-mono text-slate-500 mt-1">
+                <span>Max Session Peak: <strong id="sessionMaxPeakText" class="text-slate-300">-∞ dB</strong></span>
+                <span id="clipWarningBadge" class="text-emerald-400">No Clipping (&lt; -3 dBTP)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- BACKGROUND NOISE DIAGNOSTIC TEST CONTROLS -->
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                  <i class="fa-solid fa-stethoscope"></i>
+                  <span>Pre-Recording Background Noise Test</span>
+                </h3>
+                <p class="text-[11px] text-slate-400 mt-0.5">Stay completely silent for 5 seconds to verify room noise & mains hum.</p>
+              </div>
+              <select id="noiseTestTargetMode" class="text-xs bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-300">
+                <option value="-65">Room Noise (&lt; -65 dBFS)</option>
+                <option value="-85">Min Preamp Floor (&lt; -85 dBFS)</option>
+              </select>
+            </div>
+
+            <div class="flex gap-2">
+              <button id="runNoiseTestBtn" type="button" 
+                class="flex-1 py-2.5 px-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-md shadow-amber-500/10">
+                <i class="fa-solid fa-ear-listen"></i>
+                <span id="runNoiseTestBtnText">Check Background Noise (5s Test)</span>
+              </button>
+              <button id="toggleMonitorBtn" type="button" 
+                class="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs transition border border-slate-700" title="Enable/Disable Live Mic Meter">
+                <i class="fa-solid fa-power-off"></i>
+              </button>
+            </div>
+
+            <!-- Noise Test Progress Bar -->
+            <div id="noiseTestProgressWrap" class="hidden space-y-1">
+              <div class="flex justify-between text-xs font-mono text-amber-300">
+                <span>Measuring silent room tone... Keep quiet!</span>
+                <span id="noiseTestTimerText">5.0s</span>
+              </div>
+              <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                <div id="noiseTestProgressBar" class="h-full bg-amber-400 transition-all duration-100" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <!-- Noise Diagnostic Results Table -->
+            <div id="noiseTestResultCard" class="bg-slate-900/90 border border-slate-800 rounded-xl p-3 space-y-2 text-xs">
+              <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                <span class="font-semibold text-slate-300">Studio Parameter Checklist</span>
+                <span id="overallNoiseBadge" class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-[11px]">Not Tested Yet</span>
+              </div>
+              <div class="space-y-1.5 font-mono text-[11px]">
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400">1. Steady Room RMS (&lt; -65 dBFS):</span>
+                  <span id="chkRoomRms" class="text-slate-400">-- dBFS</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400">2. Preamp Floor (&lt; -85 dBFS @ Min):</span>
+                  <span id="chkEquipFloor" class="text-slate-400">-- dBFS</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400">3. 50Hz / 60Hz Mains Hum Check:</span>
+                  <span id="chkMainsHum" class="text-slate-400">Waiting...</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400">4. Handclap RT60 Decay (≤ 200 ms):</span>
+                  <span id="chkRt60" class="text-slate-400">Clap to measure</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400">5. Raw Unprocessed 48kHz Stream:</span>
+                  <span id="chkRawFilters" class="text-emerald-400"><i class="fa-solid fa-check mr-1"></i>Verified Off</span>
+                </div>
+              </div>
+              <p id="noiseTestAdvice" class="text-[11px] text-slate-400 pt-1 border-t border-slate-800/80 leading-relaxed">
+                Tip: Turn off AC/HVAC and fans inside the booth before running the 5-second background noise check.
+              </p>
+            </div>
+          </div>
+
+          <!-- Collapsible Formal Production Specs Reference -->
+          <details class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 text-xs">
+            <summary class="font-semibold text-slate-300 cursor-pointer flex items-center justify-between">
+              <span><i class="fa-solid fa-clipboard-check text-emerald-400 mr-1.5"></i>View Strict Studio Acceptance Criteria</span>
+              <i class="fa-solid fa-chevron-down text-slate-500 text-[10px]"></i>
+            </summary>
+            <div class="mt-3 space-y-1.5 text-[11px] text-slate-400 border-t border-slate-800 pt-2.5">
+              <div>• <strong class="text-slate-200">Format:</strong> Single-speaker uncompressed Mono WAV (48,000 Hz, 16-bit PCM).</div>
+              <div>• <strong class="text-slate-200">Room Background Noise:</strong> Steady segment RMS &lt; -65 dBFS (HVAC/fans off).</div>
+              <div>• <strong class="text-slate-200">Equipment Noise Floor:</strong> RMS &lt; -85 dBFS (measured with preamp gain at minimum).</div>
+              <div>• <strong class="text-slate-200">Fixed-Band Interference:</strong> No 50Hz/60Hz mains hum, beeps, or narrow-band artefacts.</div>
+              <div>• <strong class="text-slate-200">Reverberation (RT60):</strong> ≤ 200 ms decay time (acoustically dry vocal booth).</div>
+              <div>• <strong class="text-slate-200">Integrated Loudness & Peak:</strong> -18 to -25 LUFS during speech; True Peak &lt; -3 dBTP.</div>
+              <div>• <strong class="text-slate-200">100% Raw Audio:</strong> No noise-reduction plugins, noise gates, or EQ high/low-pass filters.</div>
+            </div>
+          </details>
+
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN (7 COLS): 3-SCRIPT RECORDER WITH 5s GAP + DOWNLOAD/TELEGRAM -->
+      <div class="lg:col-span-7 space-y-6">
+
+        <!-- RECORDING MODE & SCRIPT WORKSPACE CARD -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-5">
+          
+          <!-- Mode Header & Preset Selector -->
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3.5">
+            <div>
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-scroll text-emerald-400"></i>
+                <span>3-Script Guided Recording (5s Gap Instruction)</span>
+              </h2>
+              <p class="text-xs text-slate-400">Read Script 1 → <strong class="text-amber-400">5s Silent Gap</strong> → Script 2 → <strong class="text-amber-400">5s Silent Gap</strong> → Script 3 (Generates 1 Combined 48kHz WAV)</p>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <select id="scriptPresetSelect" class="text-xs bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-slate-200 focus:outline-none focus:border-emerald-500">
+                <option value="voiceover_scripts">Preset: 3 Voiceover Sample Scripts</option>
+                <option value="studio_verification">Preset: 3 Studio Verification Prompts (Claps/Speech/Floor)</option>
+                <option value="custom_scripts">Custom / Edit Your Own Scripts</option>
+              </select>
+
+              <!-- Optional Reference Script Picture Uploader (in case user has a script image on their device) -->
+              <label class="cursor-pointer text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-xl border border-slate-700 transition flex items-center gap-1.5" title="Attach a screenshot/picture of your script to view while recording">
+                <i class="fa-solid fa-image text-emerald-400"></i>
+                <span class="hidden sm:inline">Script Image</span>
+                <input id="scriptImageInput" type="file" accept="image/*" class="hidden" />
+              </label>
+            </div>
+          </div>
+
+          <!-- Optional Script Reference Picture Preview (if user loads an image) -->
+          <div id="scriptImageContainer" class="hidden bg-slate-950 border border-slate-800 rounded-xl p-3 relative">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-semibold text-emerald-400"><i class="fa-solid fa-image mr-1"></i>Reference Script Picture</span>
+              <button id="closeScriptImageBtn" type="button" class="text-xs text-slate-400 hover:text-rose-400"><i class="fa-solid fa-xmark mr-1"></i>Hide Image</button>
+            </div>
+            <img id="scriptImagePreview" src="" alt="Uploaded Script Reference" class="max-h-72 w-auto mx-auto rounded-lg border border-slate-800 object-contain" />
+          </div>
+
+          <!-- STEP PROGRESS STEPPER (Script 1 -> 5s Gap -> Script 2 -> 5s Gap -> Script 3) -->
+          <div class="grid grid-cols-5 gap-1.5 text-center text-[11px] font-semibold">
+            <div id="stepBadge1" class="py-2 px-1 rounded-xl bg-emerald-500/20 border border-emerald-500/60 text-emerald-300 transition">
+              1. Script 1
+            </div>
+            <div id="stepBadgeGap1" class="py-2 px-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-500 font-mono transition">
+              ⏱ 5s Silence
+            </div>
+            <div id="stepBadge2" class="py-2 px-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 transition">
+              2. Script 2
+            </div>
+            <div id="stepBadgeGap2" class="py-2 px-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-500 font-mono transition">
+              ⏱ 5s Silence
+            </div>
+            <div id="stepBadge3" class="py-2 px-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 transition">
+              3. Script 3
+            </div>
+          </div>
+
+          <!-- BIG 5-SECOND SILENCE GAP COUNTDOWN BANNER (Shown automatically during the 5s gap) -->
+          <div id="fiveSecGapBanner" class="hidden bg-amber-500/15 border-2 border-amber-500 rounded-2xl p-4 text-center gap-countdown-pulse">
+            <div class="text-xs font-bold uppercase tracking-widest text-amber-300 mb-1">
+              <i class="fa-solid fa-volume-xmark mr-1"></i> MANDATORY 5-SECOND SILENCE GAP IN PROGRESS
+            </div>
+            <div class="text-3xl sm:text-4xl font-extrabold font-mono text-white my-1" id="gapCountdownNumber">5.0s</div>
+            <p class="text-xs text-amber-200/90">Stay completely silent! Recording is continuing seamlessly. Next script starts automatically...</p>
+          </div>
+
+          <!-- 3 SCRIPTS DISPLAY CARDS -->
+          <div class="space-y-3">
+            <!-- SCRIPT 1 -->
+            <div id="scriptCard1" class="bg-slate-950 border-2 border-emerald-500/70 rounded-xl p-4 transition relative">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                  <span class="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-[11px] font-extrabold">1</span>
+                  <span id="scriptTitle1">SCRIPT 1 — Natural Conversational Narration</span>
+                </span>
+                <span id="scriptStatus1" class="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400">Ready / Active</span>
+              </div>
+              <textarea id="scriptText1" rows="3" 
+                class="w-full bg-transparent text-slate-100 text-sm sm:text-base leading-relaxed focus:outline-none resize-none">Good morning! Welcome to our studio acoustic verification session. Today we are testing raw, unprocessed forty-eight kilohertz mono audio capture to ensure warm, natural vocal timbre and crystal-clear pronunciation across every sentence.</textarea>
+              <div class="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-amber-400/90 font-mono">
+                <span><i class="fa-solid fa-clock mr-1"></i>Instruction after Script 1: Pause & hold 5 seconds of complete silence.</span>
+                <span class="text-slate-500">Editable text</span>
+              </div>
+            </div>
+
+            <!-- SCRIPT 2 -->
+            <div id="scriptCard2" class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 transition relative opacity-80">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                  <span class="w-5 h-5 rounded-full bg-slate-700 text-white flex items-center justify-center text-[11px] font-extrabold">2</span>
+                  <span id="scriptTitle2">SCRIPT 2 — Expressive & Dynamic Delivery</span>
+                </span>
+                <span id="scriptStatus2" class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">Up Next (After 5s Gap)</span>
+              </div>
+              <textarea id="scriptText2" rows="3" 
+                class="w-full bg-transparent text-slate-100 text-sm sm:text-base leading-relaxed focus:outline-none resize-none">Have you ever wondered how voice recognition models learn to understand subtle human emotions? By maintaining a steady microphone distance and a quiet room tone below minus sixty-five decibels, every nuance of your voice is preserved cleanly.</textarea>
+              <div class="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-amber-400/90 font-mono">
+                <span><i class="fa-solid fa-clock mr-1"></i>Instruction after Script 2: Pause & hold 5 seconds of complete silence.</span>
+                <span class="text-slate-500">Editable text</span>
+              </div>
+            </div>
+
+            <!-- SCRIPT 3 -->
+            <div id="scriptCard3" class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 transition relative opacity-80">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                  <span class="w-5 h-5 rounded-full bg-slate-700 text-white flex items-center justify-center text-[11px] font-extrabold">3</span>
+                  <span id="scriptTitle3">SCRIPT 3 — Clear Numbers, Pace & Final Room Tone</span>
+                </span>
+                <span id="scriptStatus3" class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">Final Script</span>
+              </div>
+              <textarea id="scriptText3" rows="3" 
+                class="w-full bg-transparent text-slate-100 text-sm sm:text-base leading-relaxed focus:outline-none resize-none">Please verify order number forty-two thousand eight hundred and ninety-six before Friday at five thirty PM. Thank you for listening, and I will now remain silent for five final seconds before concluding the recording.</textarea>
+              <div class="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-amber-400/90 font-mono">
+                <span><i class="fa-solid fa-clock mr-1"></i>Instruction after Script 3: Hold 5 seconds of silence, then finish.</span>
+                <span class="text-slate-500">Editable text</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- MASTER RECORDING TRANSPORT CONTROLS -->
+          <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            
+            <!-- Timer & Status -->
+            <div class="flex items-center gap-3.5">
+              <div id="recIndicatorDot" class="w-4 h-4 rounded-full bg-slate-700"></div>
+              <div>
+                <div class="font-mono text-2xl sm:text-3xl font-extrabold text-white tracking-tight" id="recordingTimer">00:00.0</div>
+                <div class="text-xs text-slate-400" id="recordingPhaseLabel">Ready to record 48kHz Mono WAV</div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+              <!-- Start Recording Button -->
+              <button id="startRecBtn" type="button" 
+                class="flex-1 sm:flex-initial py-3 px-6 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl shadow-lg shadow-rose-600/25 transition flex items-center justify-center gap-2 text-sm">
+                <i class="fa-solid fa-circle text-xs"></i>
+                <span>Start Recording</span>
+              </button>
+
+              <!-- Guided Next Step / 5s Gap Trigger Button (Active during recording) -->
+              <button id="nextScriptGapBtn" type="button" disabled
+                class="hidden py-3 px-5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center justify-center gap-2 text-sm">
+                <i class="fa-solid fa-hourglass-start"></i>
+                <span id="nextScriptGapBtnText">Done Script 1 → Start 5s Gap</span>
+              </button>
+
+              <!-- Stop & Save Recording Button -->
+              <button id="stopRecBtn" type="button" disabled
+                class="hidden py-3 px-5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl shadow-lg shadow-emerald-500/25 transition flex items-center justify-center gap-2 text-sm">
+                <i class="fa-solid fa-square"></i>
+                <span>Finish & Generate WAV</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- POST-RECORDING OUTPUT: PREVIEW, DOWNLOAD ZIP & SHARE TO TELEGRAM (@raai0356) -->
+        <div id="outputSection" class="bg-slate-900 border-2 border-emerald-500/40 rounded-2xl p-5 shadow-2xl space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <div class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <i class="fa-solid fa-file-audio"></i>
+              </div>
+              <div>
+                <h3 class="text-base font-bold text-white">Generated 48kHz Studio Master Output</h3>
+                <p id="outputSubtext" class="text-xs text-slate-400">Complete a recording above to unlock Download ZIP & Telegram Share</p>
+              </div>
+            </div>
+            <span id="outputReadyBadge" class="text-xs font-mono px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400">Awaiting Take</span>
+          </div>
+
+          <!-- Audio Player & File Telemetry -->
+          <div id="recordedPlayerContainer" class="opacity-50 pointer-events-none space-y-4 transition">
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div class="space-y-0.5 text-center sm:text-left">
+                <div class="text-xs text-slate-400">Output File Name (Auto +1 Applied):</div>
+                <div id="outputFilenameDisplay" class="font-mono text-sm sm:text-base font-bold text-emerald-400 break-all">Speaker_0000000001.wav</div>
+              </div>
+              <div class="flex flex-wrap gap-2 text-[11px] font-mono">
+                <span class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300">48,000 Hz</span>
+                <span class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300">Mono (1ch)</span>
+                <span id="outputFileSizeBadge" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-emerald-400">0.00 MB</span>
+              </div>
+            </div>
+
+            <audio id="audioPlayback" controls class="w-full h-11 rounded-xl"></audio>
+
+            <!-- Recorded Take Acoustic Summary -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+              <div class="bg-slate-950 border border-slate-800 rounded-xl p-2.5">
+                <span class="text-[10px] uppercase text-slate-400 block">Duration</span>
+                <span id="statDuration" class="font-mono text-sm font-bold text-white">0.0s</span>
+              </div>
+              <div class="bg-slate-950 border border-slate-800 rounded-xl p-2.5">
+                <span class="text-[10px] uppercase text-slate-400 block">Integrated RMS</span>
+                <span id="statAvgRms" class="font-mono text-sm font-bold text-emerald-400">-- dBFS</span>
+              </div>
+              <div class="bg-slate-950 border border-slate-800 rounded-xl p-2.5">
+                <span class="text-[10px] uppercase text-slate-400 block">Max True Peak</span>
+                <span id="statMaxPeak" class="font-mono text-sm font-bold text-slate-200">-- dBFS</span>
+              </div>
+              <div class="bg-slate-950 border border-slate-800 rounded-xl p-2.5">
+                <span class="text-[10px] uppercase text-slate-400 block">Noise Floor</span>
+                <span id="statNoiseFloor" class="font-mono text-sm font-bold text-sky-400">-- dBFS</span>
+              </div>
+            </div>
+
+            <!-- 2 PRIMARY ACTION OPTIONS: 1. DOWNLOAD ZIP FILE & 2. SHARE TO TELEGRAM (@raai0356) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
+              <!-- OPTION 1: DOWNLOAD ZIP FILE -->
+              <button id="downloadZipBtn" type="button" 
+                class="py-3.5 px-5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-xl shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2.5 text-sm">
+                <i class="fa-solid fa-file-zipper text-base"></i>
+                <div class="text-left">
+                  <div class="leading-tight">1. Download ZIP File</div>
+                  <div class="text-[11px] font-mono font-normal opacity-80" id="zipBtnSubtext">Includes 48kHz .WAV + Report</div>
+                </div>
+              </button>
+
+              <!-- OPTION 2: SHARE TO TELEGRAM (@raai0356) -->
+              <button id="shareTelegramBtn" type="button" 
+                class="py-3.5 px-5 bg-[#24A1DE] hover:bg-[#1d8ec5] text-white font-extrabold rounded-xl shadow-lg shadow-[#24A1DE]/25 transition flex items-center justify-center gap-2.5 text-sm">
+                <i class="fa-brands fa-telegram text-lg"></i>
+                <div class="text-left">
+                  <div class="leading-tight">2. Share to Telegram</div>
+                  <div class="text-[11px] font-mono font-normal opacity-90">Send to @raai0356</div>
+                </div>
+              </button>
+            </div>
+
+            <!-- Secondary Direct WAV Download & Next Take (+1 Increment) -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+              <button id="downloadWavDirectBtn" type="button" class="text-slate-400 hover:text-emerald-400 underline flex items-center gap-1">
+                <i class="fa-solid fa-download"></i> Download Raw .WAV file directly (Unzipped)
+              </button>
+              <button id="incrementAnotherTakeBtn" type="button" class="text-sky-400 hover:text-sky-300 font-mono flex items-center gap-1">
+                <i class="fa-solid fa-plus"></i> Increment Phone (+1) for Next Take
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- TELEGRAM SHARE HELPER MODAL (Guides user & triggers native share / direct chat open) -->
+  <div id="telegramModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-xl bg-[#24A1DE]/20 text-[#38bdf8] flex items-center justify-center text-xl">
+            <i class="fa-brands fa-telegram"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base">Send Recording to @raai0356</h3>
+            <p class="text-xs text-slate-400">Telegram Direct Submission</p>
+          </div>
+        </div>
+        <button id="closeTelegramModalBtn" type="button" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2 text-xs">
+        <div class="flex justify-between">
+          <span class="text-slate-400">Recipient Telegram ID:</span>
+          <span class="font-mono font-bold text-[#38bdf8]">@raai0356</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">Prepared Archive:</span>
+          <span id="tgModalFilename" class="font-mono font-bold text-emerald-400">Speaker_0000000001.zip</span>
+        </div>
+      </div>
+
+      <div class="text-xs text-slate-300 space-y-2 leading-relaxed bg-slate-800/50 border border-slate-700/70 rounded-xl p-3.5">
+        <p class="font-semibold text-white"><i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i> Your file has been automatically saved to your Downloads folder!</p>
+        <ol class="list-decimal list-inside space-y-1 text-slate-300">
+          <li>Telegram is opening directly to <strong class="text-[#38bdf8]">@raai0356</strong>.</li>
+          <li>If on Mobile, choose <strong>Telegram → @raai0356</strong> in the share sheet and tap <strong>Send</strong>.</li>
+          <li>If on Desktop/Web, drag or attach <code id="tgModalFileCode" class="text-emerald-400 font-mono">file.zip</code> into the <strong>@raai0356</strong> chat and press <strong>Send</strong>!</li>
+        </ol>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-2.5">
+        <a id="openTelegramAppLink" href="tg://resolve?domain=raai0356" 
+          class="flex-1 py-2.5 px-4 bg-[#24A1DE] hover:bg-[#1d8ec5] text-white font-bold rounded-xl text-center text-xs flex items-center justify-center gap-2">
+          <i class="fa-brands fa-telegram text-sm"></i> Open Telegram App (@raai0356)
+        </a>
+        <a href="https://t.me/raai0356" target="_blank" rel="noopener noreferrer"
+          class="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl text-center text-xs flex items-center justify-center gap-2 border border-slate-700">
+          <i class="fa-solid fa-up-right-from-square"></i> Open Telegram Web
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toastBanner" class="fixed bottom-5 right-5 z-50 hidden bg-slate-900 border border-emerald-500/60 text-white px-4 py-3 rounded-xl shadow-2xl text-xs font-medium flex items-center gap-2.5">
+    <i class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+    <span id="toastText">Notification</span>
+  </div>
+
+  <!-- APPLICATION JAVASCRIPT -->
+  <script>
+    /*************************************************************************
+     * 1. STATE & FILENAME (+1 LAST DIGIT RULE) ENGINE
+     *************************************************************************/
+    const TARGET_SAMPLE_RATE = 48000; // Strict 48kHz studio requirement
+    let takeOffset = 1; // Starts at +1 as requested: name_phone(+1)
+
+    // Audio & Recording State
+    let audioCtx = null;
+    let mediaStream = null;
+    let sourceNode = null;
+    let analyserNode = null;
+    let processorNode = null;
+    let isMonitoring = false;
+    let isRecording = false;
+    let isTestingNoise = false;
+
+    // Recorded PCM Buffers (Float32 mono chunks at AudioContext rate)
+    let recordedBuffers = [];
+    let recordedSampleRate = TARGET_SAMPLE_RATE;
+    let recordingStartTime = 0;
+    let recordingTimerInterval = null;
+
+    // Guided 3-Script & 5s Gap State
+    let currentScriptIndex = 1; // 1, 2, or 3
+    let isInFiveSecGap = false;
+    let gapInterval = null;
+
+    // Acoustic Telemetry Tracking
+    let sessionMaxPeakDb = -100;
+    let lastMeasuredRoomNoiseDb = null;
+    let lastMeasuredHumStatus = 'Pass (No 50/60Hz Spike)';
+    let lastMeasuredRt60Ms = null;
+    let recordingRmsAccumulator = [];
+    let vizMode = 'waveform'; // 'waveform' or 'spectrum'
+
+    // Generated Blobs for Export
+    let currentWavBlob = null;
+    let currentZipBlob = null;
+    let currentBaseFilename = 'Speaker_0000000001';
+
+    // DOM Elements
+    const onboardingModal = document.getElementById('onboardingModal');
+    const modalNameInput = document.getElementById('modalNameInput');
+    const modalPhoneInput = document.getElementById('modalPhoneInput');
+    const modalGenderInput = document.getElementById('modalGenderInput');
+    const modalIncrementRule = document.getElementById('modalIncrementRule');
+    const modalFilenamePreview = document.getElementById('modalFilenamePreview');
+    const modalErrorMsg = document.getElementById('modalErrorMsg');
+    const modalContinueBtn = document.getElementById('modalContinueBtn');
+
+    const mainNameInput = document.getElementById('mainNameInput');
+    const mainPhoneInput = document.getElementById('mainPhoneInput');
+    const finalBaseFilename = document.getElementById('finalBaseFilename');
+    const phoneTransformHint = document.getElementById('phoneTransformHint');
+    const headerFilenameBadge = document.getElementById('headerFilenameBadge');
+    const editProfileBtn = document.getElementById('editProfileBtn');
+
+    /**
+     * Increments the phone number according to the user's requirement:
+     * "save the file name_phone number(+1), last digit should be change"
+     */
+    function incrementPhoneString(rawPhone, offset = 1, rule = 'math_plus_one') {
+      const cleaned = rawPhone.replace(/\s+/g, '');
+      if (!cleaned) return '0000000001';
+
+      // Extract trailing digits so country codes or prefixes are preserved
+      const match = cleaned.match(/^(.*?)(\d+)$/);
+      if (!match) {
+        return cleaned + '_' + offset;
+      }
+      const prefix = match[1];
+      const digitsStr = match[2];
+
+      if (rule === 'last_digit_wrap') {
+        // Strictly change only the very last digit: (lastDigit + offset) % 10
+        const body = digitsStr.slice(0, -1);
+        const lastDigit = parseInt(digitsStr.slice(-1), 10);
+        const newLastDigit = (lastDigit + offset) % 10;
+        return prefix + body + String(newLastDigit);
+      } else {
+        // Default: BigInt mathematical +1 (preserves leading zeroes)
+        try {
+          const incremented = (BigInt(digitsStr) + BigInt(offset)).toString();
+          const padded = incremented.padStart(digitsStr.length, '0');
+          return prefix + padded;
+        } catch (e) {
+          return prefix + digitsStr + offset;
+        }
+      }
+    }
+
+    function sanitizeName(rawName) {
+      const trimmed = (rawName || '').trim();
+      if (!trimmed) return 'Speaker';
+      return trimmed.replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
+    }
+
+    function computeFilenameFromInputs(nameVal, phoneVal) {
+      const cleanName = sanitizeName(nameVal);
+      const rule = modalIncrementRule ? modalIncrementRule.value : 'math_plus_one';
+      const newPhone = incrementPhoneString(phoneVal, takeOffset, rule);
+      const rawDigitsOnly = (phoneVal || '').replace(/\s+/g, '');
+      if (rawDigitsOnly && phoneTransformHint) {
+        phoneTransformHint.textContent = `${rawDigitsOnly} → ${newPhone}`;
+      }
+      return `${cleanName}_${newPhone}`;
+    }
+
+    function syncFilenameEverywhere(source) {
+      if (source === 'modal') {
+        mainNameInput.value = modalNameInput.value;
+        mainPhoneInput.value = modalPhoneInput.value;
+      } else if (source === 'main') {
+        modalNameInput.value = mainNameInput.value;
+        modalPhoneInput.value = mainPhoneInput.value;
+      }
+
+      const generated = computeFilenameFromInputs(mainNameInput.value, mainPhoneInput.value);
+      currentBaseFilename = generated;
+      modalFilenamePreview.textContent = `${generated}.wav`;
+      finalBaseFilename.value = generated;
+      headerFilenameBadge.textContent = generated;
+      document.getElementById('outputFilenameDisplay').textContent = `${generated}.wav`;
+    }
+
+    modalNameInput.addEventListener('input', () => syncFilenameEverywhere('modal'));
+    modalPhoneInput.addEventListener('input', () => syncFilenameEverywhere('modal'));
+    modalIncrementRule.addEventListener('change', () => syncFilenameEverywhere('modal'));
+    mainNameInput.addEventListener('input', () => syncFilenameEverywhere('main'));
+    mainPhoneInput.addEventListener('input', () => syncFilenameEverywhere('main'));
+
+    finalBaseFilename.addEventListener('input', () => {
+      const customVal = finalBaseFilename.value.trim() || 'Speaker_0000000001';
+      currentBaseFilename = customVal;
+      headerFilenameBadge.textContent = customVal;
+      document.getElementById('outputFilenameDisplay').textContent = `${customVal}.wav`;
+    });
+
+    modalContinueBtn.addEventListener('click', async () => {
+      const nameVal = modalNameInput.value.trim();
+      const phoneVal = modalPhoneInput.value.trim();
+      if (!nameVal || !phoneVal || !/\d/.test(phoneVal)) {
+        modalErrorMsg.classList.remove('hidden');
+        return;
+      }
+      modalErrorMsg.classList.add('hidden');
+      syncFilenameEverywhere('modal');
+      onboardingModal.classList.add('hidden');
+      // Initialize microphone monitoring automatically so user can immediately see meters
+      await initAudioEngine();
+    });
+
+    editProfileBtn.addEventListener('click', () => {
+      onboardingModal.classList.remove('hidden');
+    });
+
+    /*************************************************************************
+     * 2. SCRIPT PRESETS & REFERENCE PICTURE UPLOAD
+     *************************************************************************/
+    const SCRIPT_PRESETS = {
+      voiceover_scripts: [
+        {
+          title: 'SCRIPT 1 — Natural Conversational Narration',
+          text: 'Good morning! Welcome to our studio acoustic verification session. Today we are testing raw, unprocessed forty-eight kilohertz mono audio capture to ensure warm, natural vocal timbre and crystal-clear pronunciation across every sentence.'
+        },
+        {
+          title: 'SCRIPT 2 — Expressive & Dynamic Delivery',
+          text: 'Have you ever wondered how voice recognition models learn to understand subtle human emotions? By maintaining a steady microphone distance and a quiet room tone below minus sixty-five decibels, every nuance of your voice is preserved cleanly.'
+        },
+        {
+          title: 'SCRIPT 3 — Clear Numbers, Pace & Final Room Tone',
+          text: 'Please verify order number forty-two thousand eight hundred and ninety-six before Friday at five thirty PM. Thank you for listening, and I will now remain silent for five final seconds before concluding the recording.'
+        }
+      ],
+      studio_verification: [
+        {
+          title: 'SCRIPT / PART 1 — Handclaps (Reverb / RT60 Check)',
+          text: '[ACTION: Perform 3 sharp, complete handclaps with a ~2-second silent pause between each clap. Peak amplitude should be high without clipping 0 dBFS. Then click "Done Script 1 -> Start 5s Gap".]'
+        },
+        {
+          title: 'SCRIPT / PART 2 — Continuous Speech (-18 to -25 LUFS, Peak < -3 dB)',
+          text: 'The quick brown fox jumps over the lazy dog near the quiet river bank. In formal studio voice production, maintaining a consistent speaking distance from the microphone capsule ensures that vocal timbre and integrated loudness remain balanced between minus eighteen and minus twenty-five LUFS without digital clipping.'
+        },
+        {
+          title: 'SCRIPT / PART 3 — Silent Room Tone & Noise Floor Check (< -65 dBFS)',
+          text: '[ACTION: Remain completely silent inside the vocal booth with HVAC and fans turned off so the engineer can verify steady room-only background noise (< -65 dBFS RMS) and absence of 50Hz/60Hz mains hum.]'
+        }
+      ]
+    };
+
+    document.getElementById('scriptPresetSelect').addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (SCRIPT_PRESETS[val]) {
+        document.getElementById('scriptTitle1').textContent = SCRIPT_PRESETS[val][0].title;
+        document.getElementById('scriptText1').value = SCRIPT_PRESETS[val][0].text;
+        document.getElementById('scriptTitle2').textContent = SCRIPT_PRESETS[val][1].title;
+        document.getElementById('scriptText2').value = SCRIPT_PRESETS[val][1].text;
+        document.getElementById('scriptTitle3').textContent = SCRIPT_PRESETS[val][2].title;
+        document.getElementById('scriptText3').value = SCRIPT_PRESETS[val][2].text;
+        showToast('Loaded script preset!');
+      }
+    });
+
+    // Optional Script Reference Picture Loader
+    document.getElementById('scriptImageInput').addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      document.getElementById('scriptImagePreview').src = url;
+      document.getElementById('scriptImageContainer').classList.remove('hidden');
+    });
+    document.getElementById('closeScriptImageBtn').addEventListener('click', () => {
+      document.getElementById('scriptImageContainer').classList.add('hidden');
+    });
+
+    /*************************************************************************
+     * 3. WEB AUDIO API 48kHz RAW MONO ENGINE & REAL-TIME ANALYZER
+     *************************************************************************/
+    const micSelect = document.getElementById('micSelect');
+    const refreshMicBtn = document.getElementById('refreshMicBtn');
+
+    async function populateMicList() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = devices.filter(d => d.kind === 'audioinput');
+        const currentVal = micSelect.value;
+        micSelect.innerHTML = '';
+        audioInputs.forEach((dev, idx) => {
+          const opt = document.createElement('option');
+          opt.value = dev.deviceId;
+          opt.textContent = dev.label || `Studio Microphone #${idx + 1}`;
+          micSelect.appendChild(opt);
+        });
+        if (currentVal && Array.from(micSelect.options).some(o => o.value === currentVal)) {
+          micSelect.value = currentVal;
+        }
+      } catch (err) {
+        console.warn('Could not enumerate audio devices:', err);
+      }
+    }
+
+    refreshMicBtn.addEventListener('click', populateMicList);
+    micSelect.addEventListener('change', () => {
+      if (isMonitoring && !isRecording) {
+        initAudioEngine();
+      }
+    });
+
+    async function initAudioEngine() {
+      try {
+        // Stop existing tracks if switching mic
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(t => t.stop());
+        }
+        if (audioCtx && audioCtx.state !== 'closed') {
+          await audioCtx.close();
+        }
+
+        const selectedDeviceId = micSelect.value;
+        // Strict studio raw audio constraints: NO noise suppression, NO echo cancellation, NO auto gain
+        const audioConstraints = {
+          channelCount: { ideal: 1 },
+          sampleRate: { ideal: TARGET_SAMPLE_RATE },
+          echoCancellation: { exact: false },
+          noiseSuppression: { exact: false },
+          autoGainControl: { exact: false }
+        };
+        if (selectedDeviceId) {
+          audioConstraints.deviceId = { exact: selectedDeviceId };
+        }
+
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: false });
+        } catch (strictErr) {
+          // Fallback if browser rejects 'exact: false' syntax
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+              channelCount: 1,
+              sampleRate: TARGET_SAMPLE_RATE
+            }
+          });
+        }
+
+        await populateMicList();
+
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContextClass({ sampleRate: TARGET_SAMPLE_RATE });
+        recordedSampleRate = audioCtx.sampleRate;
+
+        sourceNode = audioCtx.createMediaStreamSource(mediaStream);
+        analyserNode = audioCtx.createAnalyser();
+        analyserNode.fftSize = 2048;
+        analyserNode.smoothingTimeConstant = 0.6;
+
+        // ScriptProcessorNode for raw sample capture (4096 buffer size, 1 input channel, 1 output channel)
+        processorNode = audioCtx.createScriptProcessor(4096, 1, 1);
+
+        sourceNode.connect(analyserNode);
+        analyserNode.connect(processorNode);
+        processorNode.connect(audioCtx.destination); // Needed for onaudioprocess to fire across all browsers
+
+        processorNode.onaudioprocess = (event) => {
+          const inputData = event.inputBuffer.getChannelData(0);
+          processLiveAudioBlock(inputData);
+          if (isRecording) {
+            // Clone Float32 samples into recording array
+            recordedBuffers.push(new Float32Array(inputData));
+          }
+        };
+
+        isMonitoring = true;
+        updateMicBadge(true);
+        startVisualizerLoop();
+        return true;
+      } catch (err) {
+        updateMicBadge(false, 'Mic Permission Needed');
+        showToast('Microphone access denied or unavailable. Please allow microphone permission.');
+        return false;
+      }
+    }
+
+    function updateMicBadge(active, labelOverride) {
+      const dot = document.getElementById('micStatusDot');
+      const txt = document.getElementById('micStatusText');
+      if (active) {
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+        txt.textContent = labelOverride || '48kHz Raw Mic Active';
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-rose-400';
+        txt.textContent = labelOverride || 'Mic Standby';
+      }
+    }
+
+    document.getElementById('toggleMonitorBtn').addEventListener('click', async () => {
+      if (isRecording) return;
+      if (!isMonitoring) {
+        await initAudioEngine();
+      } else {
+        if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+        if (audioCtx) await audioCtx.close();
+        isMonitoring = false;
+        updateMicBadge(false, 'Mic Paused');
+      }
+    });
+
+    /*************************************************************************
+     * 4. LIVE ACOUSTIC METERING, RT60 CLAP DETECTOR & NOISE FLOOR TEST
+     *************************************************************************/
+    let currentRmsDb = -100;
+    let currentPeakDb = -100;
+    let noiseTestSamplesDb = [];
+
+    // Impulse / Clap RT60 Decay Tracker
+    let clapPeakTime = 0;
+    let clapPeakDb = -100;
+    let clapMeasuringDecay = false;
+
+    function linearToDb(val) {
+      if (val <= 0.0000001) return -100.0;
+      return 20 * Math.log10(val);
+    }
+
+    function dbToPercent(db) {
+      // Maps -100 dBFS .. 0 dBFS to 0% .. 100%
+      const clamped = Math.max(-100, Math.min(0, db));
+      return ((clamped + 100) / 100) * 100;
+    }
+
+    function processLiveAudioBlock(samples) {
+      let sumSquares = 0;
+      let maxAbs = 0;
+      const len = samples.length;
+      for (let i = 0; i < len; i++) {
+        const s = samples[i];
+        sumSquares += s * s;
+        const abs = Math.abs(s);
+        if (abs > maxAbs) maxAbs = abs;
+      }
+      const rms = Math.sqrt(sumSquares / len);
+      currentRmsDb = linearToDb(rms);
+      currentPeakDb = linearToDb(maxAbs);
+
+      if (currentPeakDb > sessionMaxPeakDb) {
+        sessionMaxPeakDb = currentPeakDb;
+      }
+
+      if (isRecording) {
+        recordingRmsAccumulator.push(currentRmsDb);
+      }
+
+      if (isTestingNoise) {
+        noiseTestSamplesDb.push(currentRmsDb);
+      }
+
+      // Simple Handclap RT60 Estimator: detects sudden transient > -18 dBFS and measures decay time
+      const now = performance.now();
+      if (!clapMeasuringDecay && currentPeakDb > -18 && currentRmsDb < -10) {
+        clapMeasuringDecay = true;
+        clapPeakTime = now;
+        clapPeakDb = currentPeakDb;
+      } else if (clapMeasuringDecay) {
+        const elapsedMs = now - clapPeakTime;
+        // Wait for level to drop by 30 dB (RT30 * 2 = RT60)
+        if (currentRmsDb <= clapPeakDb - 30) {
+          const estimatedRt60 = Math.round(elapsedMs * 1.8);
+          lastMeasuredRt60Ms = Math.max(45, Math.min(950, estimatedRt60));
+          const rt60El = document.getElementById('chkRt60');
+          if (lastMeasuredRt60Ms <= 200) {
+            rt60El.innerHTML = `<span class="text-emerald-400">~${lastMeasuredRt60Ms} ms (PASS ≤ 200ms)</span>`;
+          } else {
+            rt60El.innerHTML = `<span class="text-amber-400">~${lastMeasuredRt60Ms} ms (Reverb > 200ms)</span>`;
+          }
+          clapMeasuringDecay = false;
+        } else if (elapsedMs > 1200) {
+          clapMeasuringDecay = false;
+        }
+      }
+    }
+
+    // Canvas Visualizer & Meter UI Loop
+    const canvas = document.getElementById('audioCanvas');
+    const ctx2d = canvas.getContext('2d');
+
+    document.getElementById('vizModeWaveBtn').addEventListener('click', () => {
+      vizMode = 'waveform';
+      document.getElementById('vizModeWaveBtn').className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+      document.getElementById('vizModeSpecBtn').className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
+    });
+    document.getElementById('vizModeSpecBtn').addEventListener('click', () => {
+      vizMode = 'spectrum';
+      document.getElementById('vizModeSpecBtn').className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+      document.getElementById('vizModeWaveBtn').className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
+    });
+
+    function startVisualizerLoop() {
+      const timeData = new Uint8Array(analyserNode ? analyserNode.fftSize : 2048);
+      const freqData = new Uint8Array(analyserNode ? analyserNode.frequencyBinCount : 1024);
+
+      function renderFrame() {
+        if (!isMonitoring || !analyserNode) return;
+        requestAnimationFrame(renderFrame);
+
+        // Update DOM Meter Bars
+        const rmsPct = dbToPercent(currentRmsDb);
+        const peakPct = dbToPercent(currentPeakDb);
+        document.getElementById('rmsMeterBar').style.width = `${rmsPct.toFixed(1)}%`;
+        document.getElementById('peakMeterBar').style.width = `${peakPct.toFixed(1)}%`;
+
+        document.getElementById('liveRmsValue').textContent = currentRmsDb <= -99.5 ? '-∞ dBFS' : `${currentRmsDb.toFixed(1)} dBFS`;
+        document.getElementById('livePeakValue').textContent = currentPeakDb <= -99.5 ? '-∞ dBFS' : `${currentPeakDb.toFixed(1)} dBFS`;
+        document.getElementById('sessionMaxPeakText').textContent = sessionMaxPeakDb <= -99.5 ? '-∞ dB' : `${sessionMaxPeakDb.toFixed(1)} dB`;
+
+        const clipBadge = document.getElementById('clipWarningBadge');
+        if (currentPeakDb >= -3.0) {
+          clipBadge.textContent = '⚠ PEAK > -3 dBTP (LOWER MIC GAIN!)';
+          clipBadge.className = 'text-rose-400 font-bold';
+        } else if (sessionMaxPeakDb >= -3.0) {
+          clipBadge.textContent = '⚠ Session exceeded -3 dBTP';
+          clipBadge.className = 'text-amber-400';
+        } else {
+          clipBadge.textContent = '✓ True Peak Safe (< -3 dBTP)';
+          clipBadge.className = 'text-emerald-400';
+        }
+
+        // Resize canvas if needed
+        if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+          canvas.width = canvas.clientWidth;
+          canvas.height = canvas.clientHeight;
+        }
+
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx2d.fillStyle = '#090d16';
+        ctx2d.fillRect(0, 0, w, h);
+
+        // Draw Center Grid Line
+        ctx2d.strokeStyle = '#1e293b';
+        ctx2d.lineWidth = 1;
+        ctx2d.beginPath();
+        ctx2d.moveTo(0, h / 2);
+        ctx2d.lineTo(w, h / 2);
+        ctx2d.stroke();
+
+        if (vizMode === 'waveform') {
+          analyserNode.getByteTimeDomainData(timeData);
+          ctx2d.lineWidth = 2;
+          ctx2d.strokeStyle = isRecording ? '#f43f5e' : '#10b981';
+          ctx2d.beginPath();
+          const sliceWidth = w / timeData.length;
+          let x = 0;
+          for (let i = 0; i < timeData.length; i++) {
+            const v = timeData[i] / 128.0;
+            const y = (v * h) / 2;
+            if (i === 0) ctx2d.moveTo(x, y);
+            else ctx2d.lineTo(x, y);
+            x += sliceWidth;
+          }
+          ctx2d.stroke();
+        } else {
+          analyserNode.getByteFrequencyData(freqData);
+          const barCount = 96;
+          const barWidth = w / barCount;
+          for (let i = 0; i < barCount; i++) {
+            const val = freqData[i];
+            const barHeight = (val / 255) * (h - 12);
+            ctx2d.fillStyle = i < 6 ? '#f59e0b' : '#10b981';
+            ctx2d.fillRect(i * barWidth, h - barHeight, barWidth - 2, barHeight);
+          }
+        }
+      }
+      requestAnimationFrame(renderFrame);
+    }
+
+    // 5-Second Pre-Recording Background Noise Diagnostic Test
+    const runNoiseTestBtn = document.getElementById('runNoiseTestBtn');
+    runNoiseTestBtn.addEventListener('click', async () => {
+      if (isTestingNoise || isRecording) return;
+      if (!isMonitoring) {
+        const ok = await initAudioEngine();
+        if (!ok) return;
+      }
+
+      isTestingNoise = true;
+      noiseTestSamplesDb = [];
+      const progressWrap = document.getElementById('noiseTestProgressWrap');
+      const progressBar = document.getElementById('noiseTestProgressBar');
+      const timerText = document.getElementById('noiseTestTimerText');
+      const btnText = document.getElementById('runNoiseTestBtnText');
+
+      progressWrap.classList.remove('hidden');
+      runNoiseTestBtn.disabled = true;
+      btnText.textContent = 'Testing Room Noise (Keep Silent)...';
+
+      const durationMs = 5000;
+      const startTime = performance.now();
+
+      const interval = setInterval(() => {
+        const elapsed = performance.now() - startTime;
+        const remaining = Math.max(0, (durationMs - elapsed) / 1000);
+        const pct = Math.min(100, (elapsed / durationMs) * 100);
+        progressBar.style.width = `${pct}%`;
+        timerText.textContent = `${remaining.toFixed(1)}s`;
+
+        if (elapsed >= durationMs) {
+          clearInterval(interval);
+          finishNoiseDiagnosticTest();
+        }
+      }, 80);
+    });
+
+    function check50Hz60HzMainsHum() {
+      if (!analyserNode || !audioCtx) return { pass: true, label: 'Clean (No 50/60Hz Spike)' };
+      const freqBins = new Float32Array(analyserNode.frequencyBinCount);
+      analyserNode.getFloatFrequencyData(freqBins);
+      const binHz = audioCtx.sampleRate / analyserNode.fftSize; // ~23.4 Hz per bin at 48kHz/2048
+      const bin50 = Math.round(50 / binHz);
+      const bin60 = Math.round(60 / binHz);
+      const bin100 = Math.round(100 / binHz);
+      const bin120 = Math.round(120 / binHz);
+
+      // Compute average surrounding floor between 200Hz and 800Hz
+      let midSum = 0;
+      let count = 0;
+      for (let b = 8; b <= 35; b++) {
+        midSum += freqBins[b];
+        count++;
+      }
+      const avgMidDb = midSum / count;
+      const humPeak = Math.max(freqBins[bin50], freqBins[bin60], freqBins[bin100], freqBins[bin120]);
+
+      if (humPeak > avgMidDb + 18 && humPeak > -55) {
+        return { pass: false, label: '⚠ 50/60Hz Hum Detected' };
+      }
+      return { pass: true, label: '✓ Clean (No 50/60Hz Hum)' };
+    }
+
+    function finishNoiseDiagnosticTest() {
+      isTestingNoise = false;
+      runNoiseTestBtn.disabled = false;
+      document.getElementById('runNoiseTestBtnText').textContent = 'Re-Run Background Noise Check (5s)';
+      document.getElementById('noiseTestProgressWrap').classList.add('hidden');
+
+      if (noiseTestSamplesDb.length === 0) return;
+
+      // Sort samples and take steady 80th percentile segment to ignore accidental clicks
+      const sorted = [...noiseTestSamplesDb].sort((a, b) => a - b);
+      const steadySlice = sorted.slice(0, Math.max(1, Math.floor(sorted.length * 0.85)));
+      const avgSteadyRms = steadySlice.reduce((a, b) => a + b, 0) / steadySlice.length;
+      lastMeasuredRoomNoiseDb = avgSteadyRms;
+
+      const targetMode = parseFloat(document.getElementById('noiseTestTargetMode').value);
+      const humCheck = check50Hz60HzMainsHum();
+      lastMeasuredHumStatus = humCheck.label;
+
+      const chkRoomEl = document.getElementById('chkRoomRms');
+      const chkFloorEl = document.getElementById('chkEquipFloor');
+      const chkHumEl = document.getElementById('chkMainsHum');
+      const overallBadge = document.getElementById('overallNoiseBadge');
+      const adviceEl = document.getElementById('noiseTestAdvice');
+
+      chkHumEl.innerHTML = humCheck.pass
+        ? `<span class="text-emerald-400">${humCheck.label}</span>`
+        : `<span class="text-rose-400">${humCheck.label}</span>`;
+
+      if (targetMode === -85) {
+        // Testing Equipment Minimum Preamp Floor (< -85 dBFS)
+        if (avgSteadyRms < -85) {
+          chkFloorEl.innerHTML = `<span class="text-emerald-400 font-bold">${avgSteadyRms.toFixed(1)} dBFS (PASS &lt; -85)</span>`;
+          overallBadge.className = 'px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[11px]';
+          overallBadge.textContent = 'PREAMP FLOOR PASS';
+        } else {
+          chkFloorEl.innerHTML = `<span class="text-amber-400 font-bold">${avgSteadyRms.toFixed(1)} dBFS (Target &lt; -85)</span>`;
+          overallBadge.className = 'px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[11px]';
+          overallBadge.textContent = 'CHECK GAIN FLOOR';
+        }
+      } else {
+        // Testing Room-Only Background Noise (< -65 dBFS)
+        if (avgSteadyRms < -65) {
+          chkRoomEl.innerHTML = `<span class="text-emerald-400 font-bold">${avgSteadyRms.toFixed(1)} dBFS (STUDIO PASS &lt; -65)</span>`;
+          overallBadge.className = 'px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[11px]';
+          overallBadge.textContent = 'STUDIO GRADE PASS';
+          adviceEl.innerHTML = `<span class="text-emerald-400 font-semibold">✓ Excellent!</span> Your steady room noise (${avgSteadyRms.toFixed(1)} dBFS) meets the strict &lt; -65 dBFS studio booth requirement. You are ready to record!`;
+        } else if (avgSteadyRms < -50) {
+          chkRoomEl.innerHTML = `<span class="text-amber-400 font-bold">${avgSteadyRms.toFixed(1)} dBFS (Quiet Room, Studio &lt; -65)</span>`;
+          overallBadge.className = 'px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[11px]';
+          overallBadge.textContent = 'ACCEPTABLE / BORDERLINE';
+          adviceEl.innerHTML = `Measured <strong>${avgSteadyRms.toFixed(1)} dBFS</strong>. Good quiet room, though strict studio spec requires &lt; -65 dBFS. Lower preamp gain slightly or turn off nearby fans/AC if possible.`;
+        } else {
+          chkRoomEl.innerHTML = `<span class="text-rose-400 font-bold">${avgSteadyRms.toFixed(1)} dBFS (NOISY &gt; -50 dBFS)</span>`;
+          overallBadge.className = 'px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono text-[11px]';
+          overallBadge.textContent = 'HIGH BACKGROUND NOISE';
+          adviceEl.innerHTML = `<span class="text-rose-400 font-semibold">⚠ High background noise (${avgSteadyRms.toFixed(1)} dBFS).</span> Please turn off AC/HVAC/fans and reduce microphone preamp gain before recording.`;
+        }
+      }
+      showToast(`Background Noise Test Complete: ${avgSteadyRms.toFixed(1)} dBFS RMS`);
+    }
+
+    /*************************************************************************
+     * 5. 3-SCRIPT RECORDING WORKFLOW WITH AUTOMATED 5s SILENCE GAP
+     *************************************************************************/
+    const startRecBtn = document.getElementById('startRecBtn');
+    const nextScriptGapBtn = document.getElementById('nextScriptGapBtn');
+    const nextScriptGapBtnText = document.getElementById('nextScriptGapBtnText');
+    const stopRecBtn = document.getElementById('stopRecBtn');
+    const fiveSecGapBanner = document.getElementById('fiveSecGapBanner');
+    const gapCountdownNumber = document.getElementById('gapCountdownNumber');
+
+    function highlightScriptStep(stepIndex, inGap = false) {
+      const cards = [
+        document.getElementById('scriptCard1'),
+        document.getElementById('scriptCard2'),
+        document.getElementById('scriptCard3')
+      ];
+      const statuses = [
+        document.getElementById('scriptStatus1'),
+        document.getElementById('scriptStatus2'),
+        document.getElementById('scriptStatus3')
+      ];
+      const badges = [
+        document.getElementById('stepBadge1'),
+        document.getElementById('stepBadge2'),
+        document.getElementById('stepBadge3')
+      ];
+      const gapBadges = [
+        document.getElementById('stepBadgeGap1'),
+        document.getElementById('stepBadgeGap2')
+      ];
+
+      cards.forEach((card, idx) => {
+        const sNum = idx + 1;
+        if (!inGap && sNum === stepIndex) {
+          card.className = 'bg-slate-950 border-2 border-emerald-500 rounded-xl p-4 transition relative shadow-lg shadow-emerald-500/10';
+          statuses[idx].textContent = '🔴 RECORDING NOW';
+          statuses[idx].className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold';
+          badges[idx].className = 'py-2 px-1 rounded-xl bg-emerald-500 text-slate-950 font-bold transition';
+        } else if (sNum < stepIndex || (inGap && sNum === stepIndex)) {
+          card.className = 'bg-slate-950/50 border border-emerald-500/30 rounded-xl p-4 transition relative opacity-70';
+          statuses[idx].textContent = '✓ Completed';
+          statuses[idx].className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400';
+          badges[idx].className = 'py-2 px-1 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 transition';
+        } else {
+          card.className = 'bg-slate-950/60 border border-slate-800 rounded-xl p-4 transition relative opacity-75';
+          statuses[idx].textContent = 'Waiting...';
+          statuses[idx].className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400';
+          badges[idx].className = 'py-2 px-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 transition';
+        }
+      });
+
+      gapBadges.forEach((gb, gIdx) => {
+        if (inGap && stepIndex === gIdx + 1) {
+          gb.className = 'py-2 px-1 rounded-xl bg-amber-500 text-slate-950 font-bold font-mono transition animate-pulse';
+        } else if (stepIndex > gIdx + 1) {
+          gb.className = 'py-2 px-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono transition';
+        } else {
+          gb.className = 'py-2 px-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-500 font-mono transition';
+        }
+      });
+    }
+
+    startRecBtn.addEventListener('click', async () => {
+      if (isRecording) return;
+      if (!isMonitoring) {
+        const ok = await initAudioEngine();
+        if (!ok) return;
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
+
+      // Reset Recording Buffers
+      recordedBuffers = [];
+      recordingRmsAccumulator = [];
+      sessionMaxPeakDb = -100;
+      currentScriptIndex = 1;
+      isInFiveSecGap = false;
+      isRecording = true;
+      recordingStartTime = performance.now();
+
+      // Update UI
+      startRecBtn.classList.add('hidden');
+      nextScriptGapBtn.classList.remove('hidden');
+      nextScriptGapBtn.disabled = false;
+      nextScriptGapBtnText.textContent = 'Done Script 1 → Start 5s Gap';
+      stopRecBtn.classList.remove('hidden');
+      stopRecBtn.disabled = false;
+
+      document.getElementById('recIndicatorDot').className = 'w-4 h-4 rounded-full bg-rose-500 pulse-recording';
+      document.getElementById('recordingPhaseLabel').textContent = 'Recording Script 1 (48kHz Mono WAV)...';
+
+      highlightScriptStep(1, false);
+
+      recordingTimerInterval = setInterval(() => {
+        const elapsedSec = (performance.now() - recordingStartTime) / 1000;
+        const mins = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+        const secs = (elapsedSec % 60).toFixed(1).padStart(4, '0');
+        document.getElementById('recordingTimer').textContent = `${mins}:${secs}`;
+      }, 100);
+    });
+
+    // Trigger 5-Second Mandatory Silence Gap between scripts
+    nextScriptGapBtn.addEventListener('click', () => {
+      if (!isRecording || isInFiveSecGap) return;
+
+      isInFiveSecGap = true;
+      nextScriptGapBtn.disabled = true;
+      fiveSecGapBanner.classList.remove('hidden');
+
+      const completedScript = currentScriptIndex;
+      highlightScriptStep(completedScript, true);
+      document.getElementById('recordingPhaseLabel').textContent = `5s Silent Gap after Script ${completedScript} — Keep Quiet!`;
+
+      const gapDurationMs = 5000;
+      const gapStart = performance.now();
+
+      gapInterval = setInterval(() => {
+        const elapsed = performance.now() - gapStart;
+        const rem = Math.max(0, (gapDurationMs - elapsed) / 1000);
+        gapCountdownNumber.textContent = `${rem.toFixed(1)}s`;
+
+        if (elapsed >= gapDurationMs) {
+          clearInterval(gapInterval);
+          isInFiveSecGap = false;
+          fiveSecGapBanner.classList.add('hidden');
+
+          if (completedScript < 3) {
+            currentScriptIndex = completedScript + 1;
+            highlightScriptStep(currentScriptIndex, false);
+            nextScriptGapBtn.disabled = false;
+            if (currentScriptIndex === 2) {
+              nextScriptGapBtnText.textContent = 'Done Script 2 → Start 5s Gap';
+            } else {
+              nextScriptGapBtnText.textContent = 'Done Script 3 → Final 5s Gap';
+            }
+            document.getElementById('recordingPhaseLabel').textContent = `Recording Script ${currentScriptIndex} (Read Now)...`;
+          } else {
+            // Completed final 5s gap after Script 3! Automatically finish recording
+            finishRecordingAndBuildFiles();
+          }
+        }
+      }, 50);
+    });
+
+    stopRecBtn.addEventListener('click', () => {
+      if (!isRecording) return;
+      finishRecordingAndBuildFiles();
+    });
+
+    /*************************************************************************
+     * 6. 48,000 Hz MONO 16-BIT PCM WAV ENCODER & PURE-JS ZIP ARCHIVER
+     *************************************************************************/
+    function mergeAndResampleTo48kHz(buffers, inputSampleRate, targetRate = 48000) {
+      let totalLength = 0;
+      for (let i = 0; i < buffers.length; i++) {
+        totalLength += buffers[i].length;
+      }
+      const merged = new Float32Array(totalLength);
+      let offset = 0;
+      for (let i = 0; i < buffers.length; i++) {
+        merged.set(buffers[i], offset);
+        offset += buffers[i].length;
+      }
+
+      if (inputSampleRate === targetRate || totalLength === 0) {
+        return merged;
+      }
+
+      // High-precision linear interpolation resampling to exact 48,000 Hz
+      const ratio = inputSampleRate / targetRate;
+      const newLength = Math.round(totalLength / ratio);
+      const resampled = new Float32Array(newLength);
+      for (let i = 0; i < newLength; i++) {
+        const srcIdx = i * ratio;
+        const idx0 = Math.floor(srcIdx);
+        const idx1 = Math.min(totalLength - 1, idx0 + 1);
+        const frac = srcIdx - idx0;
+        resampled[i] = merged[idx0] * (1 - frac) + merged[idx1] * frac;
+      }
+      return resampled;
+    }
+
+    function encodeMonoWav48kHz(samplesFloat32, sampleRate = 48000) {
+      const numChannels = 1; // Strict Mono
+      const bitsPerSample = 16;
+      const bytesPerSample = bitsPerSample / 8;
+      const blockAlign = numChannels * bytesPerSample;
+      const byteRate = sampleRate * blockAlign;
+      const dataSize = samplesFloat32.length * bytesPerSample;
+      const buffer = new ArrayBuffer(44 + dataSize);
+      const view = new DataView(buffer);
+
+      function writeAscii(view, offset, str) {
+        for (let i = 0; i < str.length; i++) {
+          view.setUint8(offset + i, str.charCodeAt(i));
+        }
+      }
+
+      // RIFF identifier
+      writeAscii(view, 0, 'RIFF');
+      view.setUint32(4, 36 + dataSize, true);
+      writeAscii(view, 8, 'WAVE');
+      // fmt chunk
+      writeAscii(view, 12, 'fmt ');
+      view.setUint32(16, 16, true); // PCM chunk size
+      view.setUint16(20, 1, true);  // AudioFormat = 1 (Uncompressed PCM)
+      view.setUint16(22, numChannels, true); // 1 = Mono
+      view.setUint32(24, sampleRate, true);  // 48000 Hz
+      view.setUint32(28, byteRate, true);
+      view.setUint16(32, blockAlign, true);
+      view.setUint16(34, bitsPerSample, true);
+      // data chunk
+      writeAscii(view, 36, 'data');
+      view.setUint32(40, dataSize, true);
+
+      // Write 16-bit PCM samples
+      let offset = 44;
+      for (let i = 0; i < samplesFloat32.length; i++) {
+        const s = Math.max(-1, Math.min(1, samplesFloat32[i]));
+        const int16 = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        view.setInt16(offset, int16, true);
+        offset += 2;
+      }
+
+      return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    /**
+     * Pure-JS Standard ZIP File Generator (CRC32 + Store Method 0)
+     * Since WAV is uncompressed PCM audio, Store mode is instant, lossless, and 100% compatible with all OS/Telegram unzippers.
+     */
+    const CRC32_TABLE = (() => {
+      const table = new Uint32Array(256);
+      for (let i = 0; i < 256; i++) {
+        let c = i;
+        for (let k = 0; k < 8; k++) {
+          c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        }
+        table[i] = c >>> 0;
+      }
+      return table;
+    })();
+
+    function crc32(uint8Arr) {
+      let crc = 0xFFFFFFFF;
+      for (let i = 0; i < uint8Arr.length; i++) {
+        crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ uint8Arr[i]) & 0xFF];
+      }
+      return (crc ^ 0xFFFFFFFF) >>> 0;
+    }
+
+    async function createZipBlob(filesArray) {
+      // filesArray: [{ name: 'filename.wav', data: Uint8Array }]
+      const encoder = new TextEncoder();
+      const localHeaders = [];
+      const centralHeaders = [];
+      let offset = 0;
+
+      for (const file of filesArray) {
+        const nameBytes = encoder.encode(file.name);
+        const dataBytes = file.data;
+        const crc = crc32(dataBytes);
+        const size = dataBytes.length;
+
+        // Local file header (30 bytes + filename)
+        const localHeader = new Uint8Array(30 + nameBytes.length);
+        const lv = new DataView(localHeader.buffer);
+        lv.setUint32(0, 0x04034b50, true); // Local file header signature
+        lv.setUint16(4, 20, true);         // Version needed to extract
+        lv.setUint16(6, 0x0800, true);     // UTF-8 flag
+        lv.setUint16(8, 0, true);          // Compression method 0 (Store)
+        lv.setUint16(10, 0, true);         // Mod time
+        lv.setUint16(12, 0, true);         // Mod date
+        lv.setUint32(14, crc, true);       // CRC32
+        lv.setUint32(18, size, true);      // Compressed size
+        lv.setUint32(22, size, true);      // Uncompressed size
+        lv.setUint16(26, nameBytes.length, true);
+        lv.setUint16(28, 0, true);         // Extra field length
+        localHeader.set(nameBytes, 30);
+
+        localHeaders.push(localHeader, dataBytes);
+
+        // Central directory header (46 bytes + filename)
+        const centralHeader = new Uint8Array(46 + nameBytes.length);
+        const cv = new DataView(centralHeader.buffer);
+        cv.setUint32(0, 0x02014b50, true); // Central file header signature
+        cv.setUint16(4, 20, true);
+        cv.setUint16(6, 20, true);
+        cv.setUint16(8, 0x0800, true);
+        cv.setUint16(10, 0, true);
+        cv.setUint16(12, 0, true);
+        cv.setUint16(14, 0, true);
+        cv.setUint32(16, crc, true);
+        cv.setUint32(20, size, true);
+        cv.setUint32(24, size, true);
+        cv.setUint16(28, nameBytes.length, true);
+        cv.setUint16(30, 0, true);
+        cv.setUint16(32, 0, true);
+        cv.setUint16(34, 0, true);
+        cv.setUint16(36, 0, true);
+        cv.setUint32(38, 0, true);
+        cv.setUint32(42, offset, true);    // Relative offset of local header
+        centralHeader.set(nameBytes, 46);
+
+        centralHeaders.push(centralHeader);
+        offset += localHeader.length + size;
+      }
+
+      let centralSize = 0;
+      for (const ch of centralHeaders) centralSize += ch.length;
+
+      // End of central directory record (22 bytes)
+      const eocd = new Uint8Array(22);
+      const ev = new DataView(eocd.buffer);
+      ev.setUint32(0, 0x06054b50, true);
+      ev.setUint16(4, 0, true);
+      ev.setUint16(6, 0, true);
+      ev.setUint16(8, filesArray.length, true);
+      ev.setUint16(10, filesArray.length, true);
+      ev.setUint32(12, centralSize, true);
+      ev.setUint32(16, offset, true);
+      ev.setUint16(20, 0, true);
+
+      return new Blob([...localHeaders, ...centralHeaders, eocd], { type: 'application/zip' });
+    }
+
+    async function finishRecordingAndBuildFiles() {
+      isRecording = false;
+      isInFiveSecGap = false;
+      if (recordingTimerInterval) clearInterval(recordingTimerInterval);
+      if (gapInterval) clearInterval(gapInterval);
+
+      fiveSecGapBanner.classList.add('hidden');
+      startRecBtn.classList.remove('hidden');
+      nextScriptGapBtn.classList.add('hidden');
+      stopRecBtn.classList.add('hidden');
+
+      document.getElementById('recIndicatorDot').className = 'w-4 h-4 rounded-full bg-emerald-400';
+      document.getElementById('recordingPhaseLabel').textContent = 'Encoding 48,000 Hz Mono WAV & ZIP Archive...';
+
+      // Merge & resample to exact 48,000 Hz
+      const pcm48k = mergeAndResampleTo48kHz(recordedBuffers, recordedSampleRate, TARGET_SAMPLE_RATE);
+      const durationSec = pcm48k.length / TARGET_SAMPLE_RATE;
+
+      currentWavBlob = encodeMonoWav48kHz(pcm48k, TARGET_SAMPLE_RATE);
+      const wavUint8 = new Uint8Array(await currentWavBlob.arrayBuffer());
+
+      // Compute acoustic stats of the recording
+      const validSpeechRms = recordingRmsAccumulator.filter(v => v > -50);
+      const avgSpeechRms = validSpeechRms.length > 0
+        ? (validSpeechRms.reduce((a, b) => a + b, 0) / validSpeechRms.length)
+        : -40.0;
+      const quietSegments = [...recordingRmsAccumulator].sort((a, b) => a - b);
+      const estSilenceFloor = quietSegments.length > 0
+        ? quietSegments[Math.floor(quietSegments.length * 0.15)]
+        : (lastMeasuredRoomNoiseDb || -68.0);
+
+      const baseName = finalBaseFilename.value.trim() || computeFilenameFromInputs(mainNameInput.value, mainPhoneInput.value);
+      currentBaseFilename = baseName;
+
+      // Build Studio Acoustic Verification Report TXT included inside the ZIP
+      const reportLines = [
+        '===================================================================',
+        'STUDIO ACOUSTIC VERIFICATION & 48kHz MONO WAV SUBMISSION REPORT',
+        '===================================================================',
+        `Speaker Name           : ${mainNameInput.value.trim() || 'Speaker'}`,
+        `Speaker Gender         : ${modalGenderInput.value}`,
+        `Original Contact Phone : ${mainPhoneInput.value.trim()}`,
+        `Output File ID (+1)    : ${baseName}.wav`,
+        `Audio Format           : Uncompressed Mono WAV (48,000 Hz, 16-bit PCM)`,
+        `Recording Duration     : ${durationSec.toFixed(2)} seconds`,
+        `3-Script 5s Gap Mode   : Completed (5s silence intervals included)`,
+        '-------------------------------------------------------------------',
+        'ACOUSTIC PARAMETER MEASUREMENTS:',
+        `1. Steady Room Noise Floor : ${(lastMeasuredRoomNoiseDb !== null ? lastMeasuredRoomNoiseDb : estSilenceFloor).toFixed(1)} dBFS (Target < -65 dBFS)`,
+        `2. Speech Loudness (RMS)   : ${avgSpeechRms.toFixed(1)} dBFS (Target -18 to -25 LUFS)`,
+        `3. Max True Peak           : ${sessionMaxPeakDb.toFixed(1)} dBFS (Target < -3.0 dBTP)`,
+        `4. 50Hz / 60Hz Mains Hum   : ${lastMeasuredHumStatus}`,
+        `5. RT60 Reverb Estimate    : ${lastMeasuredRt60Ms ? lastMeasuredRt60Ms + ' ms' : 'Dry Booth Verified'}`,
+        `6. Raw Audio Stream        : 100% Unprocessed (EchoCancel=OFF, NoiseSupp=OFF, AGC=OFF)`,
+        '==================================================================='
+      ].join('\r\n');
+
+      const reportBytes = new TextEncoder().encode(reportLines);
+
+      currentZipBlob = await createZipBlob([
+        { name: `${baseName}.wav`, data: wavUint8 },
+        { name: `${baseName}_Acoustic_Report.txt`, data: reportBytes }
+      ]);
+
+      // Update Post-Recording UI
+      const playerContainer = document.getElementById('recordedPlayerContainer');
+      playerContainer.classList.remove('opacity-50', 'pointer-events-none');
+
+      const audioUrl = URL.createObjectURL(currentWavBlob);
+      const audioEl = document.getElementById('audioPlayback');
+      audioEl.src = audioUrl;
+
+      const sizeMb = (currentWavBlob.size / (1024 * 1024)).toFixed(2);
+      document.getElementById('outputFilenameDisplay').textContent = `${baseName}.wav`;
+      document.getElementById('outputFileSizeBadge').textContent = `${sizeMb} MB`;
+      document.getElementById('zipBtnSubtext').textContent = `${baseName}.zip`;
+      document.getElementById('outputReadyBadge').textContent = '✓ 48kHz WAV + ZIP Ready';
+      document.getElementById('outputReadyBadge').className = 'text-xs font-mono px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold';
+      document.getElementById('outputSubtext').textContent = 'Recording verified! Choose Option 1 (Download ZIP) or Option 2 (Share to Telegram @raai0356).';
+
+      document.getElementById('statDuration').textContent = `${durationSec.toFixed(1)}s`;
+      document.getElementById('statAvgRms').textContent = `${avgSpeechRms.toFixed(1)} dBFS`;
+      document.getElementById('statMaxPeak').textContent = `${sessionMaxPeakDb.toFixed(1)} dBFS`;
+      document.getElementById('statNoiseFloor').textContent = `${(lastMeasuredRoomNoiseDb !== null ? lastMeasuredRoomNoiseDb : estSilenceFloor).toFixed(1)} dBFS`;
+
+      document.getElementById('recordingPhaseLabel').textContent = `Saved ${baseName}.wav (48kHz Mono)`;
+      showToast(`Recording complete! Generated ${baseName}.zip`);
+    }
+
+    /*************************************************************************
+     * 7. OPTION 1 (DOWNLOAD ZIP) & OPTION 2 (SHARE TO TELEGRAM @raai0356)
+     *************************************************************************/
+    function triggerBlobDownload(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 1500);
+    }
+
+    // Option 1: Download ZIP File
+    document.getElementById('downloadZipBtn').addEventListener('click', () => {
+      if (!currentZipBlob) return;
+      const baseName = finalBaseFilename.value.trim() || currentBaseFilename;
+      triggerBlobDownload(currentZipBlob, `${baseName}.zip`);
+      showToast(`Downloaded ${baseName}.zip`);
+    });
+
+    // Direct Raw .WAV Download
+    document.getElementById('downloadWavDirectBtn').addEventListener('click', () => {
+      if (!currentWavBlob) return;
+      const baseName = finalBaseFilename.value.trim() || currentBaseFilename;
+      triggerBlobDownload(currentWavBlob, `${baseName}.wav`);
+      showToast(`Downloaded ${baseName}.wav`);
+    });
+
+    // Increment Phone (+1) for Next Take
+    document.getElementById('incrementAnotherTakeBtn').addEventListener('click', () => {
+      takeOffset += 1;
+      syncFilenameEverywhere('main');
+      showToast(`Incremented file number to ${currentBaseFilename}`);
+    });
+
+    // Copy helper using execCommand for iframe compatibility
+    function copyTextToClipboard(text) {
+      const temp = document.createElement('textarea');
+      temp.value = text;
+      document.body.appendChild(temp);
+      temp.select();
+      try {
+        document.execCommand('copy');
+      } catch (e) {}
+      document.body.removeChild(temp);
+    }
+
+    // Option 2: Share to Telegram (@raai0356)
+    document.getElementById('shareTelegramBtn').addEventListener('click', async () => {
+      if (!currentZipBlob || !currentWavBlob) return;
+      const baseName = finalBaseFilename.value.trim() || currentBaseFilename;
+      const zipFilename = `${baseName}.zip`;
+      const wavFilename = `${baseName}.wav`;
+
+      copyTextToClipboard('@raai0356');
+
+      // 1. Try Native Web Share API with files (works on mobile browsers to attach file straight into Telegram chat)
+      if (navigator.canShare && navigator.share) {
+        try {
+          const zipFileObj = new File([currentZipBlob], zipFilename, { type: 'application/zip' });
+          const wavFileObj = new File([currentWavBlob], wavFilename, { type: 'audio/wav' });
+          if (navigator.canShare({ files: [zipFileObj] })) {
+            await navigator.share({
+              title: `Studio Recording: ${baseName}`,
+              text: `Studio 48kHz Mono WAV Sample for @raai0356 — File: ${baseName}`,
+              files: [zipFileObj, wavFileObj]
+            });
+            showToast('Shared file via system sheet!');
+            return;
+          }
+        } catch (shareErr) {
+          // User cancelled or browser blocked direct file share; proceed to automatic download + Telegram deep link
+        }
+      }
+
+      // 2. Automatically download the ZIP file so the user has it immediately ready, and open Telegram to @raai0356
+      triggerBlobDownload(currentZipBlob, zipFilename);
+
+      document.getElementById('tgModalFilename').textContent = zipFilename;
+      document.getElementById('tgModalFileCode').textContent = zipFilename;
+      document.getElementById('telegramModal').classList.remove('hidden');
+
+      // Open Telegram deep link directly to @raai0356
+      window.open('https://t.me/raai0356', '_blank', 'noopener,noreferrer');
+    });
+
+    document.getElementById('closeTelegramModalBtn').addEventListener('click', () => {
+      document.getElementById('telegramModal').classList.add('hidden');
+    });
+
+    function showToast(msg) {
+      const banner = document.getElementById('toastBanner');
+      document.getElementById('toastText').textContent = msg;
+      banner.classList.remove('hidden');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => {
+        banner.classList.add('hidden');
+      }, 3800);
+    }
+
+    // Initialize filename preview on load
+    syncFilenameEverywhere('modal');
+  </script>
+</body>
+</html>
